@@ -166,6 +166,7 @@ async function guessFramework(octokit, contentOptions, info) {
     }
 
     if (info.csproj) {
+        // TODO: need to check csproj because there are other frameworks like Uno and Statiq
         return "blazor";
     }
 
@@ -201,9 +202,6 @@ async function guessFramework(octokit, contentOptions, info) {
         }
         if (Object.keys(packageJson.content.dependencies).find(p => p === "next")) {
             return "next";
-        }
-        if (Object.keys(packageJson.content.dependencies).find(p => p === "nuxt")) {
-            return "nuxt";
         }
         if (Object.keys(packageJson.content.dependencies).find(p => p === "nuxt")) {
             return "nuxt";
