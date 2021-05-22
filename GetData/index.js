@@ -7,11 +7,11 @@ module.exports = async function (context, myTimer) {
     const octokit = new Octokit({
         auth: process.env.GITHUB_PAT
     });
-
+    console.log(process.env.GITHUB_PAT.substring(0, 6));
     const { data } = await octokit.search.code({
         q: "Azure/static-web-apps-deploy language:YAML",
         sort: "indexed",
-        per_page: 100
+        per_page: 120
     });
 
     const workflows = data.items;
@@ -25,6 +25,7 @@ module.exports = async function (context, myTimer) {
         }
     }
 
+    let prevContentOptions = null;
     for (const workflow of workflows) {
         workflow.info = {
             errors: [],
@@ -39,6 +40,17 @@ module.exports = async function (context, myTimer) {
                 path: workflow.path,
                 ref: getRef(workflow.url)
             };
+
+            if (prevContentOptions) {
+                if (contentOptions.owner === prevContentOptions.owner &&
+                    contentOptions.repo === prevContentOptions.repo) {
+
+                    context.log("Skipping duplicate: " + JSON.stringify(contentOptions));
+                    workflow.skipped = true;
+                    continue;
+                }
+            }
+            prevContentOptions = contentOptions;
             
             const { content: workflowContent } = await getContent(octokit, contentOptions);
             const deployJob = workflowContent.jobs.build_and_deploy_job;
@@ -227,11 +239,15 @@ async function sendEmail(workflows, counters) {
     const counterKeys = Object.keys(counters).sort();
     for (const key of counterKeys) {
         if (Number.isInteger(counters[key])) {
-            emailBody += `${key}: ${counters[key]}<br />`;
+            emailBody += `${key}: ${counters[key]} (${(100.0 * counters[key] / counters.TOTAL).toFixed(1)}%)<br />`;
         }
     }
 
     for (const workflow of workflows) {
+        if (workflow.skipped) {
+            continue;
+        }
+
         const repoNameMatch = /https:\/\/.+?\/(.+?\/.+?)\//.exec(workflow.html_url);
         const repoName = repoNameMatch[1];
 
